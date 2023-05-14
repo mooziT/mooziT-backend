@@ -1,0 +1,266 @@
+service: moozit
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ap-northeast-2
+  stage: dev
+  environment: 
+    postTableName: post2
+    tokenTableName: tokens
+    commentTableName: comments
+    bucketName: ${self:custom.bucketName}
+    imageUploadBucket: ${self:custom.imageUploadBucket}
+    region: ${self:provider.region}
+  iamRoleStatements:
+    - Effect: Allow
+      Action: 
+        - dynamodb:*
+        - s3:*
+      Resource: '*'
+
+functions:
+  authoriserAnyToken:
+    handler: lambdas/authorizers/anyToken.handler
+
+  #s3response:
+    #handler: lambdas/endpoints/s3Response.handler
+    #events:
+      #- s3:
+          #bucket: moozit-tester-image-upload-bucket-12345654321
+          #event: s3:ObjectCreated:*
+          #rules:
+            #- prefix: ''
+
+  imageUpload:
+    handler: lambdas/endpoints/imageUpload.handler
+    events:
+      - http:
+          path: image-upload
+          method: POST
+          cors: true
+          #authorizer:
+          #  name: authoriserAnyToken
+          #  type: request
+          #  identitySource: method.request.header.X-Amz-Security-Token          
+ 
+  createFile:
+    handler: lambdas/endpoints/createFile.handler
+    events:
+      - http:
+          path: create-file/{fileName}
+          method: POST
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+  getFile:
+    handler: lambdas/endpoints/getFile.handler
+    events:
+      - http:
+          path: get-file/{fileName}
+          method: GET
+          cors: true
+          #authorizer:
+          #  name: authoriserAnyToken
+          #  type: request
+          #  identitySource: method.request.header.X-Amz-Security-Token
+
+  getUser:
+    handler: lambdas/endpoints/getUser.handler
+    events:
+      - http:
+          path: get-user/{ID}
+          method: GET
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+ 
+  getPost:
+    handler: lambdas/endpoints/getPost.handler
+    events:
+      - http:
+          path: get-post/{ID}
+          method: GET
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+  
+  getTokenInfo:
+    handler: lambdas/endpoints/getTokenInfo.handler
+    events:
+      - http:
+          path: get-token-info/{ID}
+          method: GET
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+  createComment2:
+    handler: lambdas/endpoints/createComment2.handler
+    events:
+      - http:
+          path: create-comment/{ID}
+          method: POST
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+  
+  getComment2:
+    handler: lambdas/endpoints/getComment2.handler
+    events:
+      - http:
+          path: get-comment/{ID}
+          method: GET
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+  createPost:
+    handler: lambdas/endpoints/createPost.handler
+    events:
+      - http:
+          path: create-post/{ID}
+          method: POST
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+  addToken:
+    handler: lambdas/endpoints/addToken.handler
+    events:
+      - http:
+          path: add-token/{ID}
+          method: POST
+          cors: true 
+
+  modifyToken:
+    handler: lambdas/endpoints/modifyToken.handler
+    events:
+      - http:
+          path: modify-token/{ID}
+          method: PUT
+          cors: true 
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+  getAllPost:
+    handler: lambdas/endpoints/getAllPost.handler
+    events:
+      - http:
+          path: get-post-all/
+          method: GET
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+  modifyPost:
+    handler: lambdas/endpoints/modifyPost.handler
+    events:
+      - http:
+          path: modify-post/{ID}
+          method: PUT
+          cors: true
+          authorizer:
+            name: authoriserAnyToken
+            type: request
+            identitySource: method.request.header.X-Amz-Security-Token
+
+resources:
+  Resources:
+    DemoBucketUpload:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.bucketName}
+    ImageUploadBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:custom.imageUploadBucket}
+        AccessControl: PublicRead
+        #NotificationConfiguration:
+          #LambdaConfigurations:
+            #- Event: s3:ObjectCreated:*
+              #Function: ${self:service}-${self:provider.stage}-s3-response
+    PostTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: post2
+        AttributeDefinitions:
+          - AttributeName: ID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ID
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    CommentTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: comments
+        AttributeDefinitions:
+          - AttributeName: ID
+            AttributeType: S
+          - AttributeName: post_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ID
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST    
+        GlobalSecondaryIndexes:
+          - IndexName: post-id
+            KeySchema:
+              - AttributeName: post_id
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+
+    TokenTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: tokens
+        AttributeDefinitions:
+          - AttributeName: ID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: ID
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST    
+
+plugins:
+  - serverless-offline
+  - serverless-s3-sync
+  - serverless-webpack
+
+package:
+  individually: true
+
+custom:
+  serverless-offline:
+    httpPort: 8080 # API Gateway 테스트용 포트 번호
+    lambdaPort: 8081 # Lambda 테스트용 포트 번호
+  
+  s3Sync:
+    - bucketName: ${self:custom.bucketName}
+      localDir: UploadData
+
+  bucketName: moozit-tester-bucket-12345654321
+  imageUploadBucket: moozit-tester-image-upload-bucket-12345654321
